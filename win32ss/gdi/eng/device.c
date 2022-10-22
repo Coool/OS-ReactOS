@@ -32,6 +32,97 @@ InitDeviceImpl(VOID)
     return STATUS_SUCCESS;
 }
 
+static
+BOOLEAN
+EngpHasVgaDriver(
+    IN PGRAPHICS_DEVICE pGraphicsDevice)
+{
+    WCHAR awcDeviceKey[256], awcServiceName[100];
+    PWSTR lastBkSlash;
+    NTSTATUS Status;
+    ULONG cbValue;
+    HKEY hkey;
+
+    /* Open the key for the adapters */
+    Status = RegOpenKey(L"\\Registry\\Machine\\HARDWARE\\DEVICEMAP\\VIDEO", &hkey);
+    if (!NT_SUCCESS(Status))
+    {
+        ERR("Could not open HARDWARE\\DEVICEMAP\\VIDEO registry key: 0x%08lx\n", Status);
+        return FALSE;
+    }
+
+    /* Read the name of the device key */
+    cbValue = sizeof(awcDeviceKey);
+    Status = RegQueryValue(hkey, pGraphicsDevice->szNtDeviceName, REG_SZ, awcDeviceKey, &cbValue);
+    ZwClose(hkey);
+    if (!NT_SUCCESS(Status))
+    {
+        ERR("Could not read '%S' registry value: 0x%08lx\n", Status);
+        return FALSE;
+    }
+
+    /* Replace Device0 by Video */
+    lastBkSlash = wcsrchr(awcDeviceKey, L'\\');
+    wcscpy(lastBkSlash + 1, L"Video");
+
+    /* Open device key */
+    Status = RegOpenKey(awcDeviceKey, &hkey);
+    if (!NT_SUCCESS(Status))
+    {
+        ERR("Could not open %S registry key: 0x%08lx\n", awcDeviceKey, Status);
+        return FALSE;
+    }
+
+    /* Read service name */
+    cbValue = sizeof(awcServiceName);
+    Status = RegQueryValue(hkey, L"Service", REG_SZ, awcServiceName, &cbValue);
+    ZwClose(hkey);
+    if (!NT_SUCCESS(Status))
+    {
+        ERR("Could not read Service registry value in %S: 0x%08lx\n", awcDeviceKey, Status);
+        return FALSE;
+    }
+
+    /* Device is using VGA driver if service name starts with 'VGA' (case insensitive) */
+    return _wcsnicmp(awcServiceName, L"VGA", 3) == 0;
+}
+
+/*
+ * Remove a device from gpGraphicsDeviceFirst/gpGraphicsDeviceLast list.
+ * ghsemGraphicsDeviceList mutex must already be held.
+ */
+static
+VOID
+EngpUnlinkGraphicsDevice(
+    IN PGRAPHICS_DEVICE pToDelete)
+{
+    PGRAPHICS_DEVICE pPrevGraphicsDevice = NULL;
+    PGRAPHICS_DEVICE pGraphicsDevice = gpGraphicsDeviceFirst;
+
+    while (pGraphicsDevice)
+    {
+        if (pGraphicsDevice != pToDelete)
+        {
+            /* Keep current device */
+            pPrevGraphicsDevice = pGraphicsDevice;
+            pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+        }
+        else
+        {
+            /* We need to remove current device */
+            pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+
+            /* Unlink chain */
+            if (!pPrevGraphicsDevice)
+                gpGraphicsDeviceFirst = pToDelete->pNextGraphicsDevice;
+            else
+                pPrevGraphicsDevice->pNextGraphicsDevice = pToDelete->pNextGraphicsDevice;
+            if (gpGraphicsDeviceLast == pToDelete)
+                gpGraphicsDeviceLast = pPrevGraphicsDevice;
+        }
+    }
+}
+
 NTSTATUS
 EngpUpdateGraphicsDeviceList(VOID)
 {
@@ -41,6 +132,7 @@ EngpUpdateGraphicsDeviceList(VOID)
     WCHAR awcBuffer[256];
     NTSTATUS Status;
     PGRAPHICS_DEVICE pGraphicsDevice;
+    BOOLEAN bFoundNewDevice = FALSE;
     ULONG cbValue;
     HKEY hkey;
 
@@ -109,6 +201,7 @@ EngpUpdateGraphicsDeviceList(VOID)
                 TRACE("gpVgaGraphicsDevice = %p\n", gpVgaGraphicsDevice);
             }
         }
+        bFoundNewDevice = TRUE;
 
         /* Set the first one as primary device */
         if (!gpPrimaryGraphicsDevice)
@@ -120,6 +213,40 @@ EngpUpdateGraphicsDeviceList(VOID)
 
     /* Close the device map registry key */
     ZwClose(hkey);
+
+    if (bFoundNewDevice && UserGetBaseVideo())
+    {
+        PGRAPHICS_DEVICE pToDelete;
+
+        /* Lock loader */
+        EngAcquireSemaphore(ghsemGraphicsDeviceList);
+
+        /* Remove every device from linked list, except base-video one */
+        pGraphicsDevice = gpGraphicsDeviceFirst;
+        while (pGraphicsDevice)
+        {
+            if (!EngpHasVgaDriver(pGraphicsDevice))
+            {
+                /* Not base-video device. Remove it */
+                TRACE("Removing non-base-video device %S (%S)\n", pToDelete->szWinDeviceName, pToDelete->szNtDeviceName);
+
+                pToDelete = pGraphicsDevice;
+                EngpUnlinkGraphicsDevice(pGraphicsDevice);
+                pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+
+                /* Free memory */
+                ExFreePoolWithTag(pToDelete->pDiplayDrivers, GDITAG_DRVSUP);
+                ExFreePoolWithTag(pToDelete, GDITAG_GDEVICE);
+            }
+            else
+            {
+                pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+            }
+        }
+
+        /* Unlock loader */
+        EngReleaseSemaphore(ghsemGraphicsDeviceList);
+    }
 
     return STATUS_SUCCESS;
 }
