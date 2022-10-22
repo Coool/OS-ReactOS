@@ -146,6 +146,21 @@ InitDisplayDriver(
     return pGraphicsDevice;
 }
 
+BOOLEAN
+NTAPI
+UserGetBaseVideo(VOID)
+{
+    return gbBaseVideo;
+}
+
+VOID
+NTAPI
+UserSetBaseVideo(
+    IN BOOLEAN bBaseVideo)
+{
+    gbBaseVideo = bBaseVideo;
+}
+
 NTSTATUS
 NTAPI
 InitVideo(VOID)
