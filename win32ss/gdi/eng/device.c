@@ -110,6 +110,24 @@ EngpUnlinkGraphicsDevice(
         else
         {
             /* We need to remove current device */
+            if (pGraphicsDevice->pVgaDevice)
+            {
+                /* pVgaDevice may have been removed from list in a previous call. Add it back in that case */
+                PGRAPHICS_DEVICE pVga;
+                for (pVga = gpGraphicsDeviceFirst;
+                    pVga && pVga != pGraphicsDevice->pVgaDevice;
+                    pVga = pVga->pNextGraphicsDevice)
+                {
+                }
+                if (!pVga)
+                {
+                    /* We need to add back */
+                    pGraphicsDevice->pVgaDevice->pNextGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+                    pGraphicsDevice->pNextGraphicsDevice = pGraphicsDevice->pVgaDevice;
+                    pGraphicsDevice->pVgaDevice = NULL;
+                }
+            }
+
             pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
 
             /* Unlink chain */
@@ -191,16 +209,6 @@ EngpUpdateGraphicsDeviceList(VOID)
         pGraphicsDevice = InitDisplayDriver(awcDeviceName, awcBuffer);
         if (!pGraphicsDevice) continue;
 
-        /* Check if this is a VGA compatible adapter */
-        if (pGraphicsDevice->StateFlags & DISPLAY_DEVICE_VGA_COMPATIBLE)
-        {
-            /* Save this as the VGA adapter */
-            if (!gpVgaGraphicsDevice)
-            {
-                gpVgaGraphicsDevice = pGraphicsDevice;
-                TRACE("gpVgaGraphicsDevice = %p\n", gpVgaGraphicsDevice);
-            }
-        }
         bFoundNewDevice = TRUE;
 
         /* Set the first one as primary device */
@@ -213,6 +221,54 @@ EngpUpdateGraphicsDeviceList(VOID)
 
     /* Close the device map registry key */
     ZwClose(hkey);
+
+    /* Search for a compatible VGA device */
+    if (bFoundNewDevice)
+    {
+        /* Pointer to the best VGA device, ie a VGA-compatible device not using (if possible) vga.sys */
+        PGRAPHICS_DEVICE pVgaDevice = NULL;
+
+        /* Lock loader */
+        EngAcquireSemaphore(ghsemGraphicsDeviceList);
+
+        pGraphicsDevice = gpGraphicsDeviceFirst;
+        while (pGraphicsDevice)
+        {
+            if (pGraphicsDevice->StateFlags & DISPLAY_DEVICE_VGA_COMPATIBLE)
+            {
+                /* Candidate for VGA device */
+                if (!pVgaDevice)
+                {
+                    /* Use this new device, as it is the first VGA-compatible device */
+                    pVgaDevice = pGraphicsDevice;
+                }
+                else if (EngpHasVgaDriver(pVgaDevice))
+                {
+                    /* Use this new device as better VGA device, as it doesn't use vga.sys.
+                     * However, link device with vga.sys to current device. */
+                    pGraphicsDevice->pVgaDevice = pVgaDevice;
+                    EngpUnlinkGraphicsDevice(pVgaDevice);
+                    pVgaDevice = pGraphicsDevice;
+                }
+                else if (EngpHasVgaDriver(pGraphicsDevice))
+                {
+                    /* Found device with vga.sys driver. Link it to currently best VGA device */
+                    pVgaDevice->pVgaDevice = pGraphicsDevice;
+                    pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+                    EngpUnlinkGraphicsDevice(pVgaDevice->pVgaDevice);
+                    continue;
+                }
+            }
+            pGraphicsDevice = pGraphicsDevice->pNextGraphicsDevice;
+        }
+
+        /* Unlock loader */
+        EngReleaseSemaphore(ghsemGraphicsDeviceList);
+
+        /* Store in global variable the best VGA device */
+        gpVgaGraphicsDevice = pVgaDevice;
+        TRACE("gpVgaGraphicsDevice = %p\n", gpVgaGraphicsDevice);
+    }
 
     if (bFoundNewDevice && UserGetBaseVideo())
     {
