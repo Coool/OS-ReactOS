@@ -452,9 +452,9 @@ EngpRegisterGraphicsDevice(
     TRACE("EngpRegisterGraphicsDevice(%wZ)\n", pustrDeviceName);
 
     /* Allocate a GRAPHICS_DEVICE structure */
-    pGraphicsDevice = ExAllocatePoolWithTag(PagedPool,
-                                            sizeof(GRAPHICS_DEVICE),
-                                            GDITAG_GDEVICE);
+    pGraphicsDevice = ExAllocatePoolZero(PagedPool,
+                                         sizeof(GRAPHICS_DEVICE),
+                                         GDITAG_GDEVICE);
     if (!pGraphicsDevice)
     {
         ERR("ExAllocatePoolWithTag failed\n");
