@@ -1,0 +1,76 @@
+/*
+ * PROJECT:    ReactOS Multimedia Player
+ * LICENSE:    LGPL-2.1-or-later (https://spdx.org/licenses/LGPL-2.1-or-later)
+ * FILE:       base/applications/mplay32/lang/lv-LV.rc
+ * PURPOSE:    Latvian resource file for mplay32
+ * TRANSLATOR: Copyright 2022 Coool (github.com/Coool) <coool@mail.lv>
+ * REFERENCES: Latvian resource file
+ */
+
+LANGUAGE LANG_LATVIAN, SUBLANG_DEFAULT
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "&Fails"
+    BEGIN
+        MENUITEM "&Atvērt...\tCtrl+O", IDM_OPEN_FILE
+        MENUITEM "A&izvērt\tCtrl+W", IDM_CLOSE_FILE
+        MENUITEM SEPARATOR
+        MENUITEM "I&ziet", IDM_EXIT
+    END
+    POPUP "&Atskaņot"
+    BEGIN
+        MENUITEM "Atskaņot/&Iepauzēt\tCtrl+P", IDC_PLAY
+        MENUITEM "A&pstādināt\tCtrl+S", IDC_STOP
+        MENUITEM SEPARATOR
+        MENUITEM "A&tkārtot\tCtrl+T", IDM_REPEAT
+    END
+    POPUP "&Skats"
+    BEGIN
+        MENUITEM "Viena loga &režīms", IDM_SWITCHVIEW
+    END
+    POPUP "&Ierīces"
+    BEGIN
+        MENUITEM SEPARATOR
+        MENUITEM "&Parametri", IDM_DEVPROPS
+        MENUITEM SEPARATOR
+        MENUITEM "&Skaļums", IDM_VOLUMECTL
+    END
+    POPUP "&Palīgs"
+    BEGIN
+        MENUITEM "P&ar programmu", IDM_ABOUT
+    END
+END
+
+ID_ACCELERATORS ACCELERATORS
+BEGIN
+    "^O", IDM_OPEN_FILE
+    "^W", IDM_CLOSE_FILE
+    "^P", IDC_PLAY
+    "^S", IDC_STOP
+    "^T", IDM_REPEAT
+END
+
+STRINGTABLE
+BEGIN
+    IDS_MODE_UNKNOWN "Nezināms"
+    IDS_MODE_OPEN "Atvērts"
+    IDS_MODE_STOP "Apstādināts"
+    IDS_MODE_PLAY "Atskaņo"
+    IDS_MODE_PAUSE "Iepauzēts"
+    IDS_MODE_RECORD "Ieraksta"
+    IDS_MODE_SEEK "Tiņ"
+    IDS_MODE_NOT_READY "Nav gatavs"
+    IDS_ALL_TYPES_FILTER "Visi atbalstītie"
+    IDS_TOOLTIP_PLAY "Atskaņot"
+    IDS_TOOLTIP_STOP "Apstādināt"
+    IDS_TOOLTIP_EJECT "Izstumt"
+    IDS_TOOLTIP_BACKWARD "Atpakaļ"
+    IDS_TOOLTIP_SEEKBACK "Attīt atpakaļ"
+    IDS_TOOLTIP_SEEKFORW "Tīt uz priekšu"
+    IDS_TOOLTIP_FORWARD "Uz priekšu"
+    IDS_TOOLTIP_PAUSE "Iepauzēt"
+    IDS_APPTITLE "ReactOS multimediju atskaņotājs"
+    IDS_PLAY "Atskaņot"
+    IDS_DEFAULTMCIERRMSG "Nezināma kļūda."
+END
